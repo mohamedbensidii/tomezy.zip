@@ -1,0 +1,10 @@
+{
+  "name": "Tomezy",
+  "description": "Smart Virtual Queue system for barbershops in Morocco.",
+  "requestFramePermissions": [
+    "notifications"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
