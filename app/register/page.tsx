@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link'; // مدمج ومستورد بشكل صحيح 100% لمنع أخطاء Vercel
 
 export default function RegisterPage() {
   const [shopName, setShopName] = useState('');
@@ -16,7 +15,6 @@ export default function RegisterPage() {
   const supabase = createClient();
   const router = useRouter();
 
-  // تنظيف الرابط الفريد تلقائياً أثناء الكتابة
   const handleSlugChange = (val: string) => {
     const cleaned = val
       .toLowerCase()               
@@ -37,35 +35,54 @@ export default function RegisterPage() {
     }
 
     try {
-      // 1. إنشاء الحساب
+      // 1. محاولة إنشاء الحساب في Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (authError) throw authError;
+      // إذا كان الحساب موجود مسبقاً، سنحاول تسجيل الدخول به مباشرة لإكمال العملية
+      let userId = authData?.user?.id;
 
-      if (authData?.user) {
-        // 2. إدخال بيانات الصالون
+      if (authError) {
+        if (authError.message.includes('already registered') || authError.message.includes('exists')) {
+          // تسجيل الدخول الفوري إذا كان الحساب موجوداً بالفعل لتفادي التعليق
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+          if (loginError) throw loginError;
+          userId = loginData?.user?.id;
+        } else {
+          throw authError;
+        }
+      }
+
+      if (userId) {
+        // 2. إدخال بيانات الصالون أو تحديثها في قاعدة البيانات
         const { error: shopError } = await supabase
           .from('shops')
-          .insert({
-            owner_id: authData.user.id,
+          .upsert({
+            owner_id: userId,
             name: shopName,
             slug: slug
-          });
+          }, { onConflict: 'owner_id' }); // لتفادي أخطاء التكرار والدمج المباشر
 
         if (shopError) {
           if (shopError.message.includes('unique') || shopError.code === '23505') {
-            throw new Error('هذا الاسم الفريد مأخوذ من قبل! اختر اسماً آخر.');
+            throw new Error('هذا الاسم الفريد مأخوذ من قبل! اختر اسماً آخر للرابط.');
           }
           throw shopError;
         }
 
+        // 3. التوجيه الفوري والمباشر إلى لوحة التحكم
         router.push('/dashboard');
+      } else {
+        throw new Error('لم نتمكن من الحصول على معرف المستخدم، يرجى المحاولة مجدداً.');
       }
+
     } catch (err: any) {
-      setErrorMsg(err.message || 'حدث خطأ ما أثناء عملية التسجيل');
+      setErrorMsg(err.message || 'حدث خطأ أثناء إعداد الحساب');
     } finally {
       setLoading(false);
     }
@@ -75,7 +92,7 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 p-8 rounded-2xl space-y-6">
         <h1 className="text-3xl font-bold text-center text-amber-500 font-mono">Tomezy</h1>
-        <p className="text-center text-zinc-400 text-sm">إنشاء حساب صالون جديد وتفعيل الـ QR</p>
+        <p className="text-center text-zinc-400 text-sm">إنشاء حساب صالون جديد وتفعيل الـ QR المباشر</p>
 
         {errorMsg && (
           <div className="bg-red-950/50 border border-red-500 text-red-400 p-3 rounded-lg text-sm text-center">
@@ -106,7 +123,6 @@ export default function RegisterPage() {
               placeholder="مثال: mohammed-barber"
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-amber-400 font-mono text-sm focus:outline-none focus:border-amber-500"
             />
-            <p className="text-[10px] text-zinc-500 mt-1">رابط صالونك سيكون: `tomezy.vercel.app/shop/{slug || '...'}`</p>
           </div>
 
           <div>
@@ -138,20 +154,9 @@ export default function RegisterPage() {
             disabled={loading}
             className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-zinc-700 text-black font-medium p-3 rounded-lg text-sm transition-colors mt-2"
           >
-            {loading ? 'جاري الإنشاء...' : 'إنشاء حساب ومحل جديد'}
+            {loading ? 'جاري الدخول الفوري...' : 'إنشاء الحساب والدخول للوحة التحكم'}
           </button>
         </form>
-
-        {/* زر تسجيل الدخول المضمون */}
-        <div className="text-center pt-2 border-t border-zinc-800/50">
-          <p className="text-sm text-zinc-400">
-            لديك حساب بالفعل؟{" "}
-            <Link href="/login" className="text-amber-500 hover:text-amber-400 font-medium transition-colors hover:underline">
-              تسجيل الدخول
-            </Link>
-          </p>
-        </div>
-
       </div>
     </div>
   );
