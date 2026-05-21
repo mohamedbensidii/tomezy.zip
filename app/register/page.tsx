@@ -35,18 +35,16 @@ export default function RegisterPage() {
     }
 
     try {
-      // 1. محاولة إنشاء الحساب في Supabase Auth
+      // محاولة إنشاء الحساب في Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      // إذا كان الحساب موجود مسبقاً، سنحاول تسجيل الدخول به مباشرة لإكمال العملية
       let userId = authData?.user?.id;
 
       if (authError) {
         if (authError.message.includes('already registered') || authError.message.includes('exists')) {
-          // تسجيل الدخول الفوري إذا كان الحساب موجوداً بالفعل لتفادي التعليق
           const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
             email,
             password,
@@ -59,14 +57,14 @@ export default function RegisterPage() {
       }
 
       if (userId) {
-        // 2. إدخال بيانات الصالون أو تحديثها في قاعدة البيانات
+        // إدخال بيانات الصالون أو تحديثها في قاعدة البيانات
         const { error: shopError } = await supabase
           .from('shops')
           .upsert({
             owner_id: userId,
             name: shopName,
             slug: slug
-          }, { onConflict: 'owner_id' }); // لتفادي أخطاء التكرار والدمج المباشر
+          }, { onConflict: 'owner_id' });
 
         if (shopError) {
           if (shopError.message.includes('unique') || shopError.code === '23505') {
@@ -75,7 +73,7 @@ export default function RegisterPage() {
           throw shopError;
         }
 
-        // 3. التوجيه الفوري والمباشر إلى لوحة التحكم
+        // التوجيه الفوري والمباشر إلى لوحة التحكم
         router.push('/dashboard');
       } else {
         throw new Error('لم نتمكن من الحصول على معرف المستخدم، يرجى المحاولة مجدداً.');
@@ -157,6 +155,18 @@ export default function RegisterPage() {
             {loading ? 'جاري الدخول الفوري...' : 'إنشاء الحساب والدخول للوحة التحكم'}
           </button>
         </form>
+
+        {/* ⬇️ هذا هو السطر الجديد الذي أضفته لك الآن ليعود الزر للظهور بأمان ⬇️ */}
+        <div className="text-center pt-2 border-t border-zinc-800/50">
+          <button
+            type="button"
+            onClick={() => router.push('/login')}
+            className="text-xs text-zinc-400 hover:text-amber-500 transition-colors"
+          >
+            لديك حساب بالفعل؟ <span className="text-amber-500 underline font-medium">تسجيل الدخول من هنا</span>
+          </button>
+        </div>
+
       </div>
     </div>
   );
