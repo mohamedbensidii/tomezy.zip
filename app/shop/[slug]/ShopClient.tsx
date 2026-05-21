@@ -68,12 +68,16 @@ export default function ShopClient({ slug }: ShopClientProps) {
     setSuccess(false);
 
     try {
-      // إرسال الـ UUID الصحيح إلى جدول الطابور
+      // حساب الترتيب القادم بشكل تلقائي بناءً على الموجودين في الانتظار
+      const nextPosition = waitingCount + 1;
+
+      // إرسال الـ UUID الصحيح مع رقم الـ position لتفادي خطأ الـ not-null
       const { error } = await supabase
         .from('queue_entries')
         .insert({
           shop_id: shopId,
-          customer_name: customerName
+          customer_name: customerName,
+          position: nextPosition
         });
 
       if (error) throw error;
