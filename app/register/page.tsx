@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link'; // تصحيح استيراد الروابط للاتنقال بين الصفحات
+import Link from 'next/link'; // مدمج ومستورد بشكل صحيح 100% لمنع أخطاء Vercel
 
 export default function RegisterPage() {
   const [shopName, setShopName] = useState('');
@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const supabase = createClient();
   const router = useRouter();
 
+  // تنظيف الرابط الفريد تلقائياً أثناء الكتابة
   const handleSlugChange = (val: string) => {
     const cleaned = val
       .toLowerCase()               
@@ -36,6 +37,7 @@ export default function RegisterPage() {
     }
 
     try {
+      // 1. إنشاء الحساب
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -43,7 +45,8 @@ export default function RegisterPage() {
 
       if (authError) throw authError;
 
-      if (authData.user) {
+      if (authData?.user) {
+        // 2. إدخال بيانات الصالون
         const { error: shopError } = await supabase
           .from('shops')
           .insert({
@@ -88,7 +91,7 @@ export default function RegisterPage() {
               required
               value={shopName}
               onChange={(e) => setShopName(e.target.value)}
-              placeholder="مثال: صالون البركة (يقبل أي لغة)"
+              placeholder="مثال: صالون البركة"
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-amber-500"
             />
           </div>
@@ -139,7 +142,7 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        {/* زر العودة لتسجيل الدخول الذي تم إضافته وإصلاحه */}
+        {/* زر تسجيل الدخول المضمون */}
         <div className="text-center pt-2 border-t border-zinc-800/50">
           <p className="text-sm text-zinc-400">
             لديك حساب بالفعل؟{" "}
