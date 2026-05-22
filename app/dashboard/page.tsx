@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-// ⚡ تم تعديل مسار Supabase إلى مسار نسبي مباشر ومضمون لتخطي خطأ الـ Build في Vercel
-import { createClient } from "../../lib/supabase/client";
-// ⚡ تم تعديل الاستدعاء مؤقتاً ليقرأ من الملف المؤقت TempList لكسر جمود ذاكرة Git و Vercel
-import { QueueList } from "../../components/TempList";
+import { createClient } from "@/lib/supabase/client";
+// ✨ تم التعديل للمسار الصحيح والدقيق الذي كشفه كلود
+import { QueueList } from "@/components/dashboard/QueueList";
 
 export default function DashboardPage() {
   const supabase = createClient();
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [shopStatus, setShopStatus] = useState("open"); // حالة الصالون الحالية
+  const [shopStatus, setShopStatus] = useState("open"); 
 
-  // دالة جلب البيانات الفورية من قاعدة البيانات
   const fetchQueueEntries = async () => {
     try {
       const { data, error } = await supabase
@@ -33,7 +31,6 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchQueueEntries();
 
-    // تفعيل ميزة التحديث الفوري (Realtime) لكي يتحدث الطابور تلقائياً فور تسجيل أي زبون
     const channel = supabase
       .channel("queue_realtime_changes")
       .on(
@@ -50,7 +47,6 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // دالة تغيير حالة الصالون عند الضغط على الأزرار العلوية
   const handleStatusChange = (status: string) => {
     setShopStatus(status);
   };
@@ -66,13 +62,11 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-black text-white p-4 max-w-2xl mx-auto space-y-6">
       
-      {/* هيدر الشاشة */}
       <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
         <h1 className="text-xl font-bold text-amber-500 font-mono tracking-wider">Tomezy Dashboard</h1>
         <span className="text-xs text-zinc-500 bg-zinc-900 px-2.5 py-1 rounded-full border border-zinc-800">لوحة التحكم السحابية</span>
       </div>
 
-      {/* أزرار حالة الصالون العلوية الأربعة */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <button
           onClick={() => handleStatusChange("open")}
@@ -123,7 +117,6 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* استدعاء القائمة الموحدة والذكية */}
       <QueueList entries={entries} onCallNext={fetchQueueEntries} />
       
     </div>

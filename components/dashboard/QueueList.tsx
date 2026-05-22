@@ -1,8 +1,8 @@
 "use client";
 
-// ⚡ تم تعديل المسارات أدناه إلى مسارات نسبية مباشرة لتفادي خطأ الـ Build في Vercel
-import { Button } from "./ui/Button";
-import { createClient } from "../lib/supabase/client";
+// ✨ تم إصلاح الاستدعاءات باستخدام المعرف الرئيسي لضمان الوصول من داخل مجلد dashboard
+import { Button } from "@/components/ui/Button";
+import { createClient } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { useState } from "react";
 
@@ -16,18 +16,13 @@ export function QueueList({
   const supabase = createClient();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  // 1️⃣ فرز وتصنيف الزبائن بناءً على الحالة (Status) القادمة من قاعدة البيانات
   const servingEntry = entries.find(entry => entry.status === 'serving');
   const waitingEntries = entries.filter(entry => entry.status === 'waiting' || entry.status === '' || !entry.status);
   
-  // تحديد الزبون التالي وباقي الصف
   const nextEntry = waitingEntries[0];
   const otherEntries = waitingEntries.slice(1);
-
-  // شرط الحماية: هل يوجد زبون يتم خدمته حالياً؟
   const isClientServing = !!servingEntry;
 
-  // دالة نداء الواتساب التلقائية
   const openWhatsAppCall = (phone: string, name: string, isNext: boolean) => {
     if (!phone) {
       alert("هذا الزبون لم يقم بإدخال رقم هاتف!");
@@ -43,10 +38,8 @@ export function QueueList({
     window.open(url, "_blank");
   };
 
-  // دالة (ابدأ الخدمة): تنقل الزبون للأعلى وتغير حالته إلى serving
   const handleStartService = async (id: string) => {
-    if (isClientServing) return; // حماية إضافية تمنع التشغيل إذا كان هناك زبون بالأعلى
-    
+    if (isClientServing) return; 
     setLoadingId(id);
     try {
       const { error } = await supabase
@@ -63,7 +56,6 @@ export function QueueList({
     }
   };
 
-  // دالة (انتهت الخدمة): تحذف الزبون من الأعلى وتغير حالته إلى completed
   const handleCompleteService = async (id: string) => {
     setLoadingId(id);
     try {
@@ -80,7 +72,6 @@ export function QueueList({
     }
   };
 
-  // دالة (إلى آخر الصف): تعديل الترتيب بالاعتماد على الـ position
   const handleMoveToBack = async (id: string) => {
     try {
       const maxPosition = entries.reduce((max, item) => item.position > max ? item.position : max, 0);
@@ -93,7 +84,6 @@ export function QueueList({
     }
   };
 
-  // دالة (إلغاء الدور)
   const handleCancelEntry = async (id: string) => {
     if (confirm('هل أنت متأكد من رغبتك في إلغاء دور هذا الزبون وحذفه؟')) {
       await supabase
@@ -103,7 +93,6 @@ export function QueueList({
     }
   };
 
-  // دالة عرض الوقت بأمان
   const formatTime = (dateString: string) => {
     try {
       return format(new Date(dateString), 'hh:mm a');
@@ -115,7 +104,6 @@ export function QueueList({
   return (
     <div className="space-y-6">
       
-      {/* ─── القسم الأول: الخانة العلوية الكبيرة (الزبون الحالي) ─── */}
       <div className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center flex flex-col items-center justify-center min-h-[140px] transition-all">
         {servingEntry ? (
           <div className="space-y-4 w-full">
@@ -143,7 +131,6 @@ export function QueueList({
         )}
       </div>
 
-      {/* ─── عدادات الإحصائيات التلقائية ─── */}
       <div className="grid grid-cols-2 gap-4 border border-zinc-800 p-4 rounded-xl bg-zinc-900/30 text-center">
         <div>
           <p className="text-xs text-zinc-500">المنتظرون الآن</p>
@@ -155,7 +142,6 @@ export function QueueList({
         </div>
       </div>
 
-      {/* ─── القسم الثاني: التالي في الصف (الدور الحالي) ─── */}
       {nextEntry ? (
         <div className="space-y-3">
           <h3 className="text-xs font-bold text-zinc-400 px-1 uppercase tracking-wider">التالي في الصف (الدور الحالي)</h3>
@@ -202,7 +188,6 @@ export function QueueList({
         )
       )}
 
-      {/* ─── القسم الثالث: باقي المنتظرين خلفه ─── */}
       {otherEntries.length > 0 && (
         <div className="pt-2">
           <h3 className="text-xs font-bold text-zinc-400 mb-3 px-1 uppercase tracking-wider">باقي المنتظرين خلفه ({otherEntries.length})</h3>
