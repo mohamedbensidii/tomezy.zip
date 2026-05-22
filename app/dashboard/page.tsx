@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { QueueList } from "@/components/QueueList";
+// ⚡ تم تعديل السطر أدناه إلى مسار نسبي مباشر ومضمون لتخطي خطأ الـ Build في Vercel تماماً
+import { QueueList } from "../../components/QueueList";
 
 export default function DashboardPage() {
   const supabase = createClient();
@@ -31,7 +32,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchQueueEntries();
 
-    // ⚡ تفعيل ميزة التحديث الفوري (Realtime) لكي يتحدث الطابور تلقائياً فور تسجيل أي زبون
+    // تفعيل ميزة التحديث الفوري (Realtime) لكي يتحدث الطابور تلقائياً فور تسجيل أي زبون
     const channel = supabase
       .channel("queue_realtime_changes")
       .on(
@@ -70,7 +71,7 @@ export default function DashboardPage() {
         <span className="text-xs text-zinc-500 bg-zinc-900 px-2.5 py-1 rounded-full border border-zinc-800">لوحة التحكم السحابية</span>
       </div>
 
-      {/* ─── أزرار حالة الصالون العلوية الأربعة ─── */}
+      {/* أزرار حالة الصالون العلوية الأربعة */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <button
           onClick={() => handleStatusChange("open")}
@@ -121,7 +122,7 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* ─── استدعاء القائمة الموحدة والذكية ─── */}
+      {/* استدعاء القائمة الموحدة والذكية */}
       <QueueList entries={entries} onCallNext={fetchQueueEntries} />
       
     </div>
