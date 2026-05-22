@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useShop } from "@/hooks/useShop";
+import { useQueue } from "@/hooks/useQueue"; // استدعاء الـ Hook المصلح
 import { StatusControls } from "@/components/dashboard/StatusControls";
 import { CurrentCustomer } from "@/components/dashboard/CurrentCustomer";
 import { QueueList } from "@/components/dashboard/QueueList";
@@ -11,13 +12,9 @@ import { useRouter } from "next/navigation";
 export default function DashboardPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [shopId, setShopId] = useState<string | null>(null);
-  const [entries, setEntries] = useState<any[]>([]);
-  const [queueLoading, setQueueLoading] = useState(true);
-  
   const supabase = createClient();
   const router = useRouter();
 
-  // 1. التحقق من المستخدم وجلب الـ shopId
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -27,6 +24,7 @@ export default function DashboardPage() {
       }
       setUserId(session.user.id);
 
+      // جلب معرف المحل الخاص بالمستخدم الحالي
       const { data: shop } = await supabase
         .from('shops')
         .select('id')
@@ -41,63 +39,18 @@ export default function DashboardPage() {
     checkUser();
   }, [router, supabase]);
 
-  // 2. دالة جلب بيانات الطابور الحقيقية من جدول queue_entries
-  const fetchQueueEntries = async (id: string) => {
-    const { data, error } = await supabase
-      .from('queue_entries')
-      .select('*')
-      .eq('shop_id', id);
-    
-    if (!error && data) {
-      setEntries(data);
-    }
-    setQueueLoading(false);
-  };
-
-  // 3. تفعيل الـ Realtime للتحديث التلقائي الفوري بين الهاتفين
-  useEffect(() => {
-    if (!shopId) return;
-
-    fetchQueueEntries(shopId);
-
-    // الاشتراك في التغييرات الحية لجدول queue_entries
-    const channel = supabase
-      .channel('realtime-queue')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'queue_entries', filter: `shop_id=eq.${shopId}` },
-        () => {
-          fetchQueueEntries(shopId);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [shopId, supabase]);
-
   const { shop, loading: shopLoading } = useShop(shopId || "", false);
+  const { waitingEntries, servingEntry, loading: queueLoading } = useQueue(shopId || "");
 
-  // تصفية الزبائن المنتظرين والمرتبين حسب الـ position
-  const waitingEntries = entries
-    .filter(e => e.status === 'waiting' || !e.status)
-    .sort((a, b) => (a.position || 0) - (b.position || 0));
-
-  // تحديد الزبون الجاري خدمته حالياً
-  const servingEntry = entries.find(e => e.status === 'serving');
-
-  // استدعاء الزبون التالي وتحويل حالته إلى جاري الخدمة
+  // استدعاء الزبون التالي من جدول queue_entries الصحيح
   const handleCallNext = async (entryId: string) => {
     await supabase
       .from('queue_entries')
       .update({ status: 'serving' })
       .eq('id', entryId);
-    
-    if (shopId) fetchQueueEntries(shopId);
   };
 
-  // إنهاء خدمة الزبون الحالي
+  // إنهاء خدمة الزبون الحالي في جدول queue_entries الصحيح
   const handleFinishCurrent = async (entryId: string, action: 'done' | 'skipped') => {
     const dbStatus = action === 'done' ? 'completed' : 'cancelled';
     
@@ -105,8 +58,6 @@ export default function DashboardPage() {
       .from('queue_entries')
       .update({ status: dbStatus })
       .eq('id', entryId);
-    
-    if (shopId) fetchQueueEntries(shopId);
   };
 
   if (!shopId && !shopLoading) {
@@ -121,7 +72,7 @@ export default function DashboardPage() {
     <div className="max-w-4xl mx-auto pb-24 md:pb-8">
       <header className="mb-8 hidden md:block">
         <h1 className="text-3xl font-bold text-white mb-2">{shop.name}</h1>
-        <p className="text-text-muted">نظام إدارة الطابور المتزامن</p>
+        <p className="text-text-muted">نظام إدارة الطابور الفوري</p>
       </header>
 
       <StatusControls shop={shop} />

@@ -11,15 +11,14 @@ export function useQueue(shopId: string) {
   useEffect(() => {
     if (!shopId) return;
 
-    // Initial fetch
+    // جلب البيانات الحية من الجدول الصحيح وبتنسيق الترتيب الصحيح
     const fetchQueue = async () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('queue_entries')
         .select('*')
         .eq('shop_id', shopId)
-        .in('status', ['waiting', 'serving'])
-        .order('queue_number', { ascending: true });
+        .order('position', { ascending: true }); // استخدام position بدلاً من queue_number
 
       if (data) setQueue(data);
       setLoading(false);
@@ -27,7 +26,7 @@ export function useQueue(shopId: string) {
 
     fetchQueue();
 
-    // Setup realtime subscription
+    // الاشتراك في البث المباشر الفوري للجدول الصحيح
     const channel = supabase
       .channel(`queue-${shopId}`)
       .on(
@@ -38,8 +37,7 @@ export function useQueue(shopId: string) {
           table: 'queue_entries',
           filter: `shop_id=eq.${shopId}`
         },
-        (payload) => {
-          // Re-fetch everything to ensure ordering is correct is easiest approach for MVP
+        () => {
           fetchQueue();
         }
       )
@@ -50,7 +48,8 @@ export function useQueue(shopId: string) {
     };
   }, [shopId]);
 
-  const waitingEntries = queue.filter(q => q.status === 'waiting');
+  // تصفية المنتظرين لتشمل الحالات الفارغة والجديدة تلقائياً لتظهر فوراً
+  const waitingEntries = queue.filter(q => q.status === 'waiting' || !q.status || q.status === '');
   const servingEntry = queue.find(q => q.status === 'serving');
 
   return { queue, waitingEntries, servingEntry, loading };
