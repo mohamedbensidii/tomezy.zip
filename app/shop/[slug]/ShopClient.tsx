@@ -9,6 +9,8 @@ interface ShopClientProps {
 
 export default function ShopClient({ slug }: ShopClientProps) {
   const [customerName, setCustomerName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [confirmPhone, setConfirmPhone] = useState('');
   const [shopName, setShopName] = useState('');
   const [shopId, setShopId] = useState<string | null>(null);
   const [waitingCount, setWaitingCount] = useState(0);
@@ -41,7 +43,8 @@ export default function ShopClient({ slug }: ShopClientProps) {
         const { count, error: queueError } = await supabase
           .from('queue_entries')
           .select('*', { count: 'exact', head: true })
-          .eq('shop_id', shopData.id);
+          .eq('shop_id', shopData.id)
+          .in('status', ['waiting', 'serving', '']);
 
         if (!queueError && count !== null) {
           setWaitingCount(count);
@@ -67,23 +70,44 @@ export default function ShopClient({ slug }: ShopClientProps) {
     setErrorMsg(null);
     setSuccess(false);
 
+    // 1. التحقق من تطابق الرقمين
+    if (phone.trim() !== confirmPhone.trim()) {
+      setErrorMsg('خطأ: رقم الهاتف وتأكيد الرقم غير متطابقين!');
+      setLoading(false);
+      return;
+    }
+
+    // 2. التحقق من صيغة الرقم المغربي وتحويله للصيغة الدولية تلقائياً
+    let formattedPhone = phone.trim();
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '+212' + formattedPhone.substring(1);
+    } else if (!formattedPhone.startsWith('+212')) {
+      setErrorMsg('يرجى إدخال رقم هاتف مغربي صحيح (مثال: 0612345678)');
+      setLoading(false);
+      return;
+    }
+
     try {
       // حساب الترتيب القادم بشكل تلقائي بناءً على الموجودين في الانتظار
       const nextPosition = waitingCount + 1;
 
-      // إرسال الـ UUID الصحيح مع رقم الـ position لتفادي خطأ الـ not-null
+      // إرسال البيانات كاملة مع عمود الهاتف الجديد
       const { error } = await supabase
         .from('queue_entries')
         .insert({
           shop_id: shopId,
           customer_name: customerName,
-          position: nextPosition
+          phone: formattedPhone,
+          position: nextPosition,
+          status: 'waiting'
         });
 
       if (error) throw error;
 
       setSuccess(true);
       setCustomerName('');
+      setPhone('');
+      setConfirmPhone('');
       // تحديث عدد المنتظرين تلقائياً بعد الحجز الناجح
       setWaitingCount(prev => prev + 1);
     } catch (error: any) {
@@ -144,10 +168,34 @@ export default function ShopClient({ slug }: ShopClientProps) {
             />
           </div>
 
+          <div>
+            <label className="block text-zinc-300 text-xs mb-1">رقم الهاتف (الواتساب)</label>
+            <input
+              type="tel"
+              required
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="مثال: 0612345678"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-zinc-300 text-xs mb-1">تأكيد رقم الهاتف</label>
+            <input
+              type="tel"
+              required
+              value={confirmPhone}
+              onChange={(e) => setConfirmPhone(e.target.value)}
+              placeholder="أعد كتابة رقم الهاتف للتأكيد"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-zinc-700 text-black font-medium p-3 rounded-lg text-sm transition-colors mt-2"
+            className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-zinc-700 text-black font-medium p-3 rounded-lg text-sm transition-colors mt-4"
           >
             {loading ? 'جاري الحجز...' : 'احجز دوري'}
           </button>
