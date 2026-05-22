@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-// ✨ تم التعديل للمسار الصحيح والدقيق الذي كشفه كلود
 import { QueueList } from "@/components/dashboard/QueueList";
 
 export default function DashboardPage() {
@@ -13,9 +12,43 @@ export default function DashboardPage() {
 
   const fetchQueueEntries = async () => {
     try {
+      // 1. جلب بيانات صاحب الصالون المسجل دخوله حالياً
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error("User not authenticated");
+        setLoading(false);
+        return;
+      }
+
+      // 2. البحث عن معرف الصالون (shop_id) المرتبط بهذا المستخدم بشكل ذكي وفولبروف
+      let currentShopId = user.id; // كخيار احتياطي الافتراضي هو الـ id الخاص به
+
+      // نحاول البحث في جدول الصالونات لمعرفة كود الصالون الدقيق
+      const { data: shopData1 } = await supabase
+        .from("shops")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+        
+      if (shopData1?.id) {
+        currentShopId = shopData1.id;
+      } else {
+        // إذا كان اسم العمود في جدولك هو owner_id بدلاً من user_id نجرب هذا الاحتمال أيضاً
+        const { data: shopData2 } = await supabase
+          .from("shops")
+          .select("id")
+          .eq("owner_id", user.id)
+          .maybeSingle();
+        if (shopData2?.id) {
+          currentShopId = shopData2.id;
+        }
+      }
+
+      // 3. الفلترة السحرية: جلب زبائن هذا الصالون المحدد فقط!
       const { data, error } = await supabase
         .from("queue_entries")
         .select("*")
+        .eq("shop_id", currentShopId) // ✨ هذا السطر هو الذي يمنع تداخل الحسابات نهائياً
         .in("status", ["waiting", "serving", "", null])
         .order("created_at", { ascending: true });
 
