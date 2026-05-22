@@ -20,3 +20,4 @@ self.addEventListener('fetch', (event) => {
   // يترك الطلبات تمر بسلام دون التدخل في شبكة التطبيق الحالية
   return;
 });
+ 
