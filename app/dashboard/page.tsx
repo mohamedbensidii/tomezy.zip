@@ -2,103 +2,128 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useShop } from "@/hooks/useShop";
-import { useQueue } from "@/hooks/useQueue"; // استدعاء الـ Hook المصلح
-import { StatusControls } from "@/components/dashboard/StatusControls";
-import { CurrentCustomer } from "@/components/dashboard/CurrentCustomer";
-import { QueueList } from "@/components/dashboard/QueueList";
-import { useRouter } from "next/navigation";
+import { QueueList } from "@/components/QueueList";
 
 export default function DashboardPage() {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [shopId, setShopId] = useState<string | null>(null);
   const supabase = createClient();
-  const router = useRouter();
+  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [shopStatus, setShopStatus] = useState("open"); // حالة الصالون الحالية
+
+  // دالة جلب البيانات الفورية من قاعدة البيانات
+  const fetchQueueEntries = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("queue_entries")
+        .select("*")
+        .in("status", ["waiting", "serving", "", null])
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      setEntries(data || []);
+    } catch (error) {
+      console.error("Error fetching queue entries:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-      setUserId(session.user.id);
+    fetchQueueEntries();
 
-      // جلب معرف المحل الخاص بالمستخدم الحالي
-      const { data: shop } = await supabase
-        .from('shops')
-        .select('id')
-        .eq('owner_id', session.user.id)
-        .single();
+    // ⚡ تفعيل ميزة التحديث الفوري (Realtime) لكي يتحدث الطابور تلقائياً فور تسجيل أي زبون
+    const channel = supabase
+      .channel("queue_realtime_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "queue_entries" },
+        () => {
+          fetchQueueEntries();
+        }
+      )
+      .subscribe();
 
-      if (shop) {
-        setShopId(shop.id);
-      }
+    return () => {
+      supabase.removeChannel(channel);
     };
+  }, []);
 
-    checkUser();
-  }, [router, supabase]);
-
-  const { shop, loading: shopLoading } = useShop(shopId || "", false);
-  const { waitingEntries, servingEntry, loading: queueLoading } = useQueue(shopId || "");
-
-  // استدعاء الزبون التالي من جدول queue_entries الصحيح
-  const handleCallNext = async (entryId: string) => {
-    await supabase
-      .from('queue_entries')
-      .update({ status: 'serving' })
-      .eq('id', entryId);
+  // دالة تغيير حالة الصالون عند الضغط على الأزرار العلوية
+  const handleStatusChange = (status: string) => {
+    setShopStatus(status);
   };
 
-  // إنهاء خدمة الزبون الحالي في جدول queue_entries الصحيح
-  const handleFinishCurrent = async (entryId: string, action: 'done' | 'skipped') => {
-    const dbStatus = action === 'done' ? 'completed' : 'cancelled';
-    
-    await supabase
-      .from('queue_entries')
-      .update({ status: dbStatus })
-      .eq('id', entryId);
-  };
-
-  if (!shopId && !shopLoading) {
-    return <div className="p-8 text-center text-text-muted">لم يتم العثور على محل خاص بك. يرجى الاتصال بالدعم.</div>;
-  }
-
-  if (shopLoading || queueLoading || !shop) {
-    return <div className="p-8 text-center animate-pulse text-gold-primary">جاري تحميل البيانات الحية...</div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center text-sm font-mono">
+        جاري تحميل لوحة التحكم الفورية...
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-24 md:pb-8">
-      <header className="mb-8 hidden md:block">
-        <h1 className="text-3xl font-bold text-white mb-2">{shop.name}</h1>
-        <p className="text-text-muted">نظام إدارة الطابور الفوري</p>
-      </header>
-
-      <StatusControls shop={shop} />
-
-      <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
-          <CurrentCustomer entry={servingEntry} onFinish={handleFinishCurrent} />
-
-          {/* الإحصائيات السريعة */}
-          <div className="glass-card p-4 rounded-xl space-y-4 bg-zinc-900 border border-zinc-800">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-zinc-400">المنتظرون الآن</span>
-              <span className="font-bold text-white text-lg">{waitingEntries.length} شخص</span>
-            </div>
-            <div className="w-full h-px bg-zinc-800" />
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-zinc-400">وقت الخدمة المقدر</span>
-              <span className="font-bold text-amber-500">{shop.avg_service_minutes} دقائق / زبون</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="lg:col-span-2">
-          <QueueList entries={waitingEntries} onCallNext={handleCallNext} />
-        </div>
+    <div className="min-h-screen bg-black text-white p-4 max-w-2xl mx-auto space-y-6">
+      
+      {/* هيدر الشاشة */}
+      <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
+        <h1 className="text-xl font-bold text-amber-500 font-mono tracking-wider">Tomezy Dashboard</h1>
+        <span className="text-xs text-zinc-500 bg-zinc-900 px-2.5 py-1 rounded-full border border-zinc-800">لوحة التحكم السحابية</span>
       </div>
+
+      {/* ─── أزرار حالة الصالون العلوية الأربعة ─── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <button
+          onClick={() => handleStatusChange("open")}
+          className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            shopStatus === "open"
+              ? "bg-emerald-950/40 border-emerald-500 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+              : "bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          مفتوح
+        </button>
+        
+        <button
+          onClick={() => handleStatusChange("busy")}
+          className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            shopStatus === "busy"
+              ? "bg-amber-950/40 border-amber-500 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+              : "bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-amber-500" />
+          مشغول
+        </button>
+        
+        <button
+          onClick={() => handleStatusChange("break")}
+          className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            shopStatus === "break"
+              ? "bg-blue-950/40 border-blue-500 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+              : "bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-blue-500" />
+          استراحة
+        </button>
+        
+        <button
+          onClick={() => handleStatusChange("closed")}
+          className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            shopStatus === "closed"
+              ? "bg-red-950/40 border-red-500 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+              : "bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900"
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full bg-red-500" />
+          مغلق
+        </button>
+      </div>
+
+      {/* ─── استدعاء القائمة الموحدة والذكية ─── */}
+      <QueueList entries={entries} onCallNext={fetchQueueEntries} />
+      
     </div>
   );
 }
