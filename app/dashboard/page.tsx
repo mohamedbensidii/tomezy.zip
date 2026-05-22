@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-// ⚡ تم تعديل السطر أدناه إلى مسار نسبي مباشر ومضمون لتخطي خطأ الـ Build في Vercel تماماً
-import { QueueList } from "../../components/QueueList";
+// ⚡ تم تعديل مسار Supabase إلى مسار نسبي مباشر ومضمون لتخطي خطأ الـ Build في Vercel
+import { createClient } from "../../lib/supabase/client";
+// ⚡ تم تعديل الاستدعاء مؤقتاً ليقرأ من الملف المؤقت TempList لكسر جمود ذاكرة Git و Vercel
+import { QueueList } from "../../components/TempList";
 
 export default function DashboardPage() {
   const supabase = createClient();

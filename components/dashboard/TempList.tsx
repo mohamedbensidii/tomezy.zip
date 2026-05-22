@@ -1,8 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
+// ⚡ تم تعديل المسارات أدناه إلى مسارات نسبية مباشرة لتفادي خطأ الـ Build في Vercel
+import { Button } from "./ui/Button";
+import { createClient } from "../lib/supabase/client";
 import { format } from "date-fns";
-import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 
 export function QueueList({ 
